@@ -1,0 +1,185 @@
+/*
+
+Copyright 2022 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.9.0 - tomw - Initial release
+
+*/
+
+metadata 
+{
+    definition(name: "SmartHQ Refrigerator", namespace: "tomw", author: "tomw") 
+    {
+        capability "Refresh"
+        
+        command "adjustSetpoints", [[name: "fridge*", type: "NUMBER"], [name: "freezer*", type: "NUMBER"]]
+        
+        attribute "leftDoor", "enum", ["open", "closed"]
+        attribute "rightDoor", "enum", ["open", "closed"]
+        attribute "freezer", "enum", ["open", "closed"]
+        attribute "drawer", "enum", ["open", "closed"]
+        
+        attribute "freezerActual", "number"
+        attribute "freezerSetpoint", "number"
+        attribute "fridgeActual", "number"
+        attribute "fridgeSetpoint", "number"
+        
+        attribute "airFilterStatus", "string"
+        attribute "waterFilterStatus", "string"        
+    }
+}
+
+#include tomw.smarthqHelpers
+
+def logDebug(msg) 
+{
+    log.debug(msg)
+}
+
+def refresh()
+{
+    refreshAppliance()
+}
+
+def parse(item)
+{
+    if(!item)
+    {
+        return
+    }
+    
+    logDebug(item)
+    
+    def switchVal = item.erd?.toLowerCase()
+    switch(switchVal)
+    {
+        case DOOR_STATUS:
+            parseDoorStatus(item.value)
+            break
+        
+        case CURRENT_TEMPERATURE:
+        case TEMPERATURE_SETTING:
+            parseTemps(item.value, switchVal)
+            break
+        
+        case AIR_FILTER_STATUS:
+        case WATER_FILTER_STATUS:
+            parseFilterStatus(item.value, switchVal)
+            break
+    }
+}
+
+def parseDoorStatus(value)
+{
+    try
+    {
+        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+        def events = [[:]]
+        if(4 == bytes.size())
+        {
+            events += [name: "leftDoor", value: doorNCStatus(bytes[0])]
+            events += [name: "rightDoor", value: doorNCStatus(bytes[1])]
+            events += [name: "freezer", value: doorNCStatus(bytes[2])]
+            events += [name: "drawer", value: doorNCStatus(bytes[3])]
+        }
+        
+        flushEvents(events)
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }
+}
+
+def parseTemps(value, option)
+{
+    try
+    {
+        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+        def events = [[:]]
+        if(2 == bytes.size())
+        {
+            def fridgeAttr = (CURRENT_TEMPERATURE == option) ? "fridgeActual" : "fridgeSetpoint"
+            def freezerAttr = (CURRENT_TEMPERATURE == option) ? "freezerActual" : "freezerSetpoint"
+            
+            events += [name: fridgeAttr, value: decodeErdSignedByte(bytes[0])]
+            events += [name: freezerAttr, value: decodeErdSignedByte(bytes[1])]
+        }
+        
+        flushEvents(events)
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }    
+}
+
+def parseFilterStatus(value, option)
+{
+    try
+    {
+        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+        
+        def filterName = (AIR_FILTER_STATUS == option) ? "airFilterStatus" : "waterFilterStatus"
+        
+        def status = ((0 == bytes[0]) ? bytes[1] : bytes[0]).toInteger()        
+        sendEvent(name: filterName, value: filterStatus[status])
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }    
+}
+
+def adjustSetpoints(fridge, freezer)
+{
+    def value = encodeErdSignedByte(fridge.toInteger()) + encodeErdSignedByte(freezer.toInteger())
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(TEMPERATURE_SETTING, value))
+    
+    parent?.sendWssMap(erdMap)
+}
+
+import groovy.transform.Field
+
+@Field Map filterStatus = 
+    [
+        0: "good",
+        1: "replace",
+        2: "expired",
+        3: "unfiltered",
+        4: "leak detected"
+    ]
+
+@Field AIR_FILTER_STATUS = "0x101c"
+@Field DOOR_STATUS = "0x1016"
+@Field FRIDGE_MODEL_INFO = "0x101d"
+@Field HOT_WATER_IN_USE = "0x1018"
+@Field HOT_WATER_SET_TEMP = "0x1011"
+@Field HOT_WATER_STATUS = "0x1010"
+@Field ICE_MAKER_BUCKET_STATUS = "0x1007"
+@Field ICE_MAKER_CONTROL = "0x100a"
+@Field SETPOINT_LIMITS = "0x100b"
+@Field CURRENT_TEMPERATURE = "0x1004"
+@Field TEMPERATURE_SETTING = "0x1005"
+@Field TURBO_COOL_STATUS = "0x100f"
+@Field TURBO_FREEZE_STATUS = "0x100e"
+@Field WATER_FILTER_STATUS = "0x1009"
+@Field CONVERTABLE_DRAWER_MODE = "0x1020"
+@Field INTERIOR_LIGHT = "0x1024"
+@Field PROXIMITY_LIGHT = "0x1028"

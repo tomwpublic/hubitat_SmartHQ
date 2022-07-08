@@ -1,0 +1,57 @@
+{
+  "packageName": "hubitat_SmartHQ",
+  "author": "tomw",
+  "version": "0.9.0",
+  "minimumHEVersion": "2.1.9",
+  "dateReleased": "2022-06-27",
+  "bundles": [
+    {
+      "id": "5b54c159-0e99-437d-8074-006e199207f7",
+      "name": "hubitat_SmartHQ",
+      "namespace": "tomw",
+      "location": "https://github.com/tomwpublic/hubitat_SmartHQ/blob/main/hubitat_SmartHQ.zip?raw=true",
+      "required": true
+    }
+  ],
+  "drivers": [
+    {
+      "id": "6d9d8188-e209-4bca-bb31-664ce97555d5",
+      "name": "SmartHQ System",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/smartHQ_system",
+      "required": true
+    },
+    {
+      "id": "bc42c565-c634-4472-9074-ec15fa345f55",
+      "name": "SmartHQ Refrigerator",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/devices/smartHQ_refrigerator",
+      "required": false
+    },
+    {
+      "id": "50f51a03-6f93-4b1b-8550-d10edd432fd2",
+      "name": "SmartHQ Laundry",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/devices/smartHQ_laundry",
+      "required": false
+    },
+    {
+      "id": "2e67a4ee-e6f0-45a1-bea0-f72666c7129b",
+      "name": "SmartHQ Oven",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/devices/smartHQ_oven",
+      "required": false
+    },
+    {
+      "id": "5934534f-bbf4-4ce4-985b-c4bef378d0a7",
+      "name": "SmartHQ Dishwasher",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/devices/smartHQ_dishwasher",
+      "required": false
+    }
+  ],
+  "licenseFile": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/LICENSE",
+  "releaseNotes": "0.9.0 - tomw - Initial release.",
+  "documentationLink": "https://github.com/tomwpublic/hubitat_SmartHQ/blob/main/README.md",
+  "communityLink": ""
+}

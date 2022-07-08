@@ -1,0 +1,123 @@
+/*
+
+Copyright 2022 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.9.0 - tomw - Initial release
+
+*/
+
+metadata 
+{
+    definition(name: "SmartHQ Laundry", namespace: "tomw", author: "tomw") 
+    {
+        capability "ContactSensor"
+        capability "Refresh"
+        
+        attribute "doorStatus", "enum", ["open", "closed"]
+    }
+}
+
+#include tomw.smarthqHelpers
+
+def logDebug(msg) 
+{
+    log.debug(msg)
+}
+
+def refresh()
+{
+    refreshAppliance()
+}
+
+def parse(item)
+{
+    if(!item)
+    {
+        return
+    }
+    
+    logDebug(item)
+    
+    switch(item.erd?.toLowerCase())
+    {
+        case LAUNDRY_DOOR:
+            parseDoorStatusByte(item.value, doorNormallyOpen)
+            break
+    }
+}
+
+import groovy.transform.Field
+
+@Field LAUNDRY_MACHINE_STATE = "0x2000"
+@Field LAUNDRY_SUB_CYCLE = "0x2001"
+@Field LAUNDRY_END_OF_CYCLE = "0x2002"
+@Field LAUNDRY_TIME_REMAINING = "0x2007"
+@Field LAUNDRY_WASHER_TANK_STATUS = "0x2008"
+@Field LAUNDRY_WASHER_TANK_SELECTED = "0x2009"
+@Field LAUNDRY_DELAY_TIME_REMAINING = "0x2010"
+@Field LAUNDRY_DOOR = "0x2012"
+@Field LAUNDRY_WASHER_DOOR_LOCK = "0x2013"
+@Field LAUNDRY_CYCLE = "0x200a"
+@Field LAUNDRY_DRYER_DRYNESS_LEVEL = "0x201a"
+@Field LAUNDRY_DRYER_TUMBLE_STATUS = "0x201b"
+@Field LAUNDRY_DRYER_LEVEL_SENSOR_DISABLED = "0x201c"
+@Field LAUNDRY_UNKNOWN201D = "0x201d"
+@Field LAUNDRY_WASHER_SOIL_LEVEL = "0x2015"
+@Field LAUNDRY_WASHER_WASHTEMP_LEVEL = "0x2016"
+@Field LAUNDRY_WASHER_SPINTIME_LEVEL = "0x2017"
+@Field LAUNDRY_WASHER_RINSE_OPTION = "0x2018"
+@Field LAUNDRY_DRYER_TEMPERATURE_OPTION = "0x2019"
+@Field LAUNDRY_DRYER_SHEET_USAGE_CONFIGURATION = "0x2022"
+@Field LAUNDRY_DRYER_SHEET_INVENTORY = "0x2023"
+@Field LAUNDRY_REMOTE_DELAY_CONTROL = "0x2038"
+@Field LAUNDRY_REMOTE_STATUS = "0x2039"
+@Field LAUNDRY_WASHER_SMART_DISPENSE_TANK_STATUS = "0x203c"
+@Field LAUNDRY_WASHER_SMART_DISPENSE = "0x203d"
+@Field LAUNDRY_WASHER_UNKNOWN203E = "0x203e"
+@Field LAUNDRY_REMOTE_POWER_CONTROL = "0x2040"
+@Field LAUNDRY_UNKNOWN2041 = "0x2041"
+@Field LAUNDRY_DRYER_UNKNOWN2045 = "0x2045"
+@Field LAUNDRY_DRYER_UNKNOWN2046 = "0x2046"
+@Field LAUNDRY_DRYER_UNKNOWN2047 = "0x2047"
+@Field LAUNDRY_DRYER_UNKNOWN2049 = "0x2049"
+@Field LAUNDRY_DRYER_DAMP_ALERT = "0x204a"
+@Field LAUNDRY_DRYER_UNKNOWN204C = "0x204c"
+@Field LAUNDRY_DRYER_DRYNESSNEW_LEVEL = "0x204d"
+@Field LAUNDRY_DRYER_UNKNOWN204F = "0x204f"
+@Field LAUNDRY_DRYER_TEMPERATURENEW_OPTION = "0x2050"
+@Field LAUNDRY_DRYER_UNKNOWN2051 = "0x2051"
+@Field LAUNDRY_DRYER_ECODRY_STATUS = "0x2052"
+@Field LAUNDRY_DRYER_TUMBLENEW_STATUS = "0x2053"
+@Field LAUNDRY_WASHER_UNKNOWN2054 = "0x2054"
+@Field LAUNDRY_WASHER_TIMESAVER = "0x2055"
+@Field LAUNDRY_WASHER_UNKNOWN2057 = "0x2057"
+@Field LAUNDRY_WASHER_POWERSTEAM = "0x2058"
+@Field LAUNDRY_WASHER_PREWASH = "0x205b"
+@Field LAUNDRY_DRYER_UNKNOWN205D = "0x205d"
+@Field LAUNDRY_DRYER_REDUCE_STATIC = "0x205e"
+@Field LAUNDRY_DRYER_UNKNOWN205F = "0x205f"
+@Field LAUNDRY_WASHER_UNKNOWN2060 = "0x2060"
+@Field LAUNDRY_WASHER_TUMBLECARE = "0x2061"
+@Field LAUNDRY_WASHER_UNKNOWN2069 = "0x2069"
+@Field LAUNDRY_DRYER_WASHERLINK_CYCLE = "0x206b"
+@Field LAUNDRY_DRYER_WASHERLINK_STATUS = "0x206c"
+@Field LAUNDRY_DRYER_WASHERLINK_CONTROL = "0x206e"
+@Field LAUNDRY_DRYER_UNKNOWN206F = "0x206f"
+@Field LAUNDRY_WASHER_UNKNOWN2070 = "0x2070"
+@Field LAUNDRY_WASHER_UNKNOWN2072 = "0x2072"

@@ -1,0 +1,392 @@
+/*
+
+Copyright 2022 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.9.0 - tomw - Initial release
+
+*/
+
+metadata 
+{
+    definition(name: "SmartHQ System", namespace: "tomw", author: "tomw") 
+    {
+        capability "Initialize"        
+    }
+}
+
+preferences
+{
+    section
+    {
+        input name: "username", type: "text", title: "username (email)", required: true
+        input name: "password", type: "password", title: "password", required: true        
+    }
+    section
+    {
+        input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+    }
+}
+
+#include tomw.smarthqHelpers
+#include tomw.wsReinitialize
+
+
+def logDebug(msg) 
+{
+    if (logEnable)
+    {
+        log.debug(msg)
+    }
+}
+
+def initialize()
+{
+    closeEventSocket()
+    
+    try
+    {
+        try
+        {
+            def refresh = get_oauth2_token("refresh")
+            logDebug("refresh = ${refresh}")
+        }
+        catch(Exception e)
+        {
+            // refresh_token failed for some reason, so try a full re-auth
+            def auth = get_oauth2_token("auth")
+            logDebug("auth = ${auth}")            
+        }
+    }
+    catch(Exception e)
+    {
+        logDebug("token failed: ${e.message}")
+        return
+    }
+        
+    try
+    {
+        def wssInfo = get_wss_credentials()
+        logDebug ("wssInfo = ${wssInfo}")
+        
+        openEventSocket(wssInfo?.endpoint)
+        subscribe_all()
+        get_appliance_list()
+    }
+    catch(Exception e)
+    {
+        logDebug("initialize failed: ${e.message}")
+    }
+}
+
+def updated()
+{
+    initialize()
+}
+
+def parse(String message)
+{
+    logDebug("parse: ${message}")
+    
+    try
+    {
+        interpretResponse(new groovy.json.JsonSlurper().parseText(message))        
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }    
+}
+
+def openEventSocket(url)
+{
+    try
+    {
+        interfaces.webSocket.connect(url, ignoreSSLIssues: true, perMessageDeflate: false)
+    }
+    catch (Exception e)
+    {
+        logDebug("error: ${e.message}")
+    }
+}
+
+def closeEventSocket()
+{
+    closeWebSocket()
+}
+
+def sendWssMap(msg)
+{
+    def msgJson = groovy.json.JsonOutput.toJson(msg)
+    
+    interfaces.webSocket.sendMessage(msgJson)    
+}
+
+//
+// integration functions
+//
+
+def createChildDevices(items)
+{
+    items.each
+    {
+        manageChildDevice(it.applianceId, it)
+    }        
+}
+
+def manageChildDevice(id, details = null)
+{
+    if(details == null)
+    {
+        // this is an event, which doesn't include the device type
+        //   so, only a device that already exists will work
+        return getChildDevice(childDni(id))
+    }
+    
+    try
+    {
+        switch(details.type)
+        {
+            // alias types to more generic virtual device types
+            case "Clothes Washer":
+            case "Clothes Dryer":
+                details.type = "Laundry"
+        }
+        
+        def devDetails = [label: details.nickname ?: details.type, isComponent:false, name:childDni(id), devType: "SmartHQ " + details.type, mac: id]        
+        
+        // use existing child, or create it
+        def child = getChildDevice(childDni(id)) ?: addChildDevice(devDetails.devType, childDni(id), devDetails)
+        child?.setupDevDetails(devDetails)
+        
+        return child
+    }
+    catch(com.hubitat.app.exception.UnknownDeviceTypeException e)
+    {
+        log.info "Error: unsupported device type.  (id = ${id}, type = ${details.type})"
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }
+}
+
+def childDni(id)
+{
+    return "${device.getDeviceNetworkId()}-${id}"
+}
+
+//
+// api operations
+//
+
+def interpretResponse(msgJson)
+{
+    if(!msgJson)
+    {
+        return
+    }
+    
+    if(msgJson.kind == "websocket#api")
+    {
+        // this is an API response
+        
+        switch(msgJson.id)
+        {
+            case "List-appliances":            
+                // we need this to set ERDs
+                device.updateDataValue("userId", msgJson.body?.userId)
+            
+                // create child devices for known appliances
+                logDebug msgJson.body?.items                
+                createChildDevices(msgJson.body?.items)
+                break
+            
+            case ~/.*-allErd.*/:
+                // this is a request_update response
+                def id = msgJson.body?.applianceId
+            
+                msgJson.body?.items?.each
+                {
+                    manageChildDevice(id)?.parse(it)
+                }
+            
+                break
+            
+            default:
+                logDebug("Unsupported message: ${msgJson?.id}")
+        }
+    }
+    
+    if(msgJson?.item?.erd)
+    {
+        // this is an event
+        
+        manageChildDevice(msgJson.item.applianceId)?.parse(msgJson.item)
+    }
+}
+
+def get_appliance_list()
+{
+    sendWssMap(buildWssMsg("GET", "/v1/appliance", "List-appliances"))
+}
+
+def request_update(mac)
+{
+    sendWssMap(buildWssMsg("GET", "/v1/appliance/${mac}/erd", mac + "-allErd"))
+}
+
+def subscribe_all()
+{
+    def msg =
+        [
+            kind: "websocket#subscribe",
+            action: "subscribe",
+            resources: ["/appliance/*/erd/*"]
+        ]
+    
+    sendWssMap(msg)
+}
+
+//
+// login flow
+//
+
+def get_authorization_code()
+{
+    def _csrf, signature
+    def cookie2
+
+    def params =
+        [
+            uri: loginUrl + "/oauth2/auth",
+            query: [client_id: client_id, response_type: "code", access_type: "offline", redirect_uri: redirect_uri],
+            headers: [cookie: cookie1]
+        ]
+    
+    httpGet(params)
+    {
+        resp ->
+        
+        // extract values (signature, _csrf) from HTML login page contents        
+        signature = resp.data.'**'.find { it.@name.text() == 'signature' }?.@value?.text()        
+        //logDebug signature
+        
+        def _csrfKey = resp.data.'**'.find { it.@name.text() == '_csrf' }
+        // _csrf may appear twice in the page, so get whichever one we found
+        _csrf = _csrfKey?.@content?.text() ?: _csrfKey?.@value?.text()
+        //logDebug _csrf
+        
+        // look for and capture the "JSESSION" header
+        cookie2 = resp.headers.find { it.name == "Set-Cookie" && it.value.contains("JSESSION") }?.value
+        //logDebug cookie2
+    }    
+    
+    def postParams =
+        [
+            body: [signature: signature, _csrf: _csrf, username: username, password: password],
+            uri: loginUrl + "/oauth2/g_authenticate",
+            followRedirects: false,
+            headers: [cookie: cookie1, cookie: cookie2]
+        ]
+    
+    def paramsMap = [:]
+    
+    httpPost(postParams)
+    {
+        resp->
+        //logDebug resp.getStatus()
+        
+        def locVal = resp.headers['Location']?.value
+        if(locVal)
+        {
+            def paramsList = locVal.substring(locVal.indexOf("?") + 1, locVal.length())
+            paramsList?.split("&").each
+            {
+                temp = it.split("=")
+                paramsMap.put(temp[0], temp[1])
+            }
+            
+            //logDebug paramsMap.code
+        }
+    }
+    
+    return paramsMap.code    
+}
+
+def get_oauth2_token(type)
+{
+    def postBody
+    
+    switch(type)
+    {
+        case "auth":
+            postBody = [code: get_authorization_code(), client_id: client_id, client_secret: client_secret, redirect_uri: redirect_uri, grant_type: "authorization_code"]
+            break
+        
+        case "refresh":
+            postBody = [client_id: client_id, client_secret: client_secret, redirect_uri: redirect_uri, grant_type: "refresh_token", refresh_token: state.refresh_token]
+            break            
+    }
+    
+    postParams = 
+       [
+           body: postBody,
+           uri: loginUrl + "/oauth2/token",
+           headers: [Authorization: "Basic " + ("${client_id}:${client_secret}").bytes.encodeBase64().toString()]
+       ]
+    
+    def data    
+    httpPost(postParams)
+    {
+        resp->
+        //logDebug resp.getStatus()
+        state.access_token = resp.data?.access_token
+        state.refresh_token = resp.data?.refresh_token        
+        
+        def expirSecs = resp.data?.expires_in?.toInteger()
+        if(expirSecs)
+        {
+            // schedule re-auth
+            runIn(expirSecs - 120, initialize)
+        }
+        
+        data = resp.data
+    }
+    
+    return data
+}
+
+def get_wss_credentials()
+{
+    def wssParams =
+        [
+            uri: apiUrl + "/v1/websocket",
+            headers: [Authorization: "Bearer ${state.access_token}"]
+        ]
+    
+    def data    
+    httpGet(wssParams)
+    {
+        resp->
+        //logDebug resp.getStatus()
+        data = resp.data
+    }
+    
+    return data    
+}

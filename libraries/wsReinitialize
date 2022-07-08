@@ -1,0 +1,88 @@
+library (
+    author: "tomw",
+    category: "",
+    description: "WebSocket connection management",
+    name: "wsReinitialize",
+    namespace: "tomw",
+    documentationLink: ""
+)
+
+def reinitialize()
+{
+    unschedule(initialize)
+    
+    // thanks ogiewon for the example
+    
+    // first delay is 2 seconds, doubles every time
+    def delayCalc = (state.reconnectDelay ?: 1) * 2    
+    // upper limit is 600s
+    def reconnectDelay = delayCalc <= 600 ? delayCalc : 600
+    
+    state.reconnectDelay = reconnectDelay
+    runIn(reconnectDelay, initialize)
+}
+
+def webSocketStatus(String message)
+{
+    logDebug("webSocketStatus: ${message}")
+    
+    // thanks for the idea: https://community.hubitat.com/t/websocket-client/11843/15
+    if(message.startsWith("status: open"))
+    {
+        state.reconnectDelay = 1
+        setWasExpectedClose(false)
+        
+        return
+    }
+    else if(message.startsWith("status: closing"))
+    {
+        if(getWasExpectedClose())
+        {
+            setWasExpectedClose(false)
+            return
+        }
+        
+        reinitialize()
+        
+        return
+    }
+    else if(message.startsWith("failure:"))
+    {
+        if(getWasExpectedClose())
+        {
+            setWasExpectedClose(false)
+            return
+        }
+        
+        reinitialize()
+        
+        return
+    }
+}
+
+def setWasExpectedClose(wasExpected)
+{
+    state.wasExpectedClose = wasExpected
+}
+
+def getWasExpectedClose()
+{
+    return state.wasExpectedClose ?: true
+}
+
+def closeWebSocket()
+{
+    try
+    {
+        setWasExpectedClose(true)
+        // wait for state to catch up
+        pauseExecution(500)
+        
+        interfaces.webSocket.close()
+    }
+    catch (Exception e)
+    {
+        // swallow errors
+    }
+}
+

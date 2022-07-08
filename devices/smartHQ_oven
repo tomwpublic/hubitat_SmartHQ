@@ -1,0 +1,255 @@
+/*
+
+Copyright 2022 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.9.0 - tomw - Initial release
+
+*/
+
+metadata 
+{
+    definition(name: "SmartHQ Oven", namespace: "tomw", author: "tomw") 
+    {
+        capability "PushableButton"
+        capability "Refresh"
+        
+        attribute "cooktopStatus", "enum", ["on", "off"]
+        
+        attribute "lowerCookMode", "string"
+        attribute "lowerRawTemp", "number"
+        attribute "lowerTargetTemp", "number"
+        attribute "lowerTimer", "number"
+        
+        attribute "upperCookMode", "string"
+        attribute "upperRawTemp", "number"
+        attribute "upperTargetTemp", "number"
+        attribute "upperTimer", "number"
+    }
+}
+
+#include tomw.smarthqHelpers
+
+def logDebug(msg) 
+{
+    log.debug(msg)
+}
+
+def refresh()
+{
+    refreshAppliance()
+}
+
+def parse(item)
+{
+    if(!item)
+    {
+        return
+    }
+    
+    logDebug(item)
+    
+    def switchVal = item.erd?.toLowerCase()
+    switch(switchVal)
+    {
+        case LOWER_OVEN_COOK_MODE:
+        case UPPER_OVEN_COOK_MODE:
+            parseCookMode(item.value, switchVal)
+            break
+        
+        case UPPER_OVEN_CURRENT_STATE:
+        case LOWER_OVEN_CURRENT_STATE:
+            parseCookState(item.value, switchVal)
+            break
+        
+        case LOWER_OVEN_RAW_TEMPERATURE:
+        case UPPER_OVEN_RAW_TEMPERATURE:
+            parseRawTemp(item.value, switchVal)
+            break
+        
+        case LOWER_OVEN_KITCHEN_TIMER:
+        case UPPER_OVEN_KITCHEN_TIMER:
+            parseTimerVal(item.value, switchVal)
+            break
+        
+        case KEY_PRESSED:
+            push(decodeErdInt(hubitat.helper.HexUtils.hexStringToByteArray(item.value)))
+            break
+        
+        case COOKTOP_STATUS:
+            parseCooktopStatus(item.value)
+            break
+    }
+}
+
+def parseCookMode(value, option)
+{
+    try
+    {
+        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+        def events = [[:]]
+        
+        def tempName = (UPPER_OVEN_COOK_MODE == option)  ? "upperTargetTemp" : "lowerTargetTemp"
+
+        if(13 == bytes.size())
+        {
+            parseCookState(value, option)
+            events += [name: tempName, value: decodeErdInt(subBytes(bytes, 1, 2))]
+        }
+        
+        flushEvents(events)
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }
+}
+
+def parseCookState(value, option)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    def modeName = ([UPPER_OVEN_CURRENT_STATE, UPPER_OVEN_COOK_MODE].contains(option))  ? "upperCookMode" : "lowerCookMode"
+    
+    sendEvent(name: modeName, value: knownModes[decodeErdInt(subBytes(bytes, 0, 1))] ?: "unknown")
+}
+
+def parseRawTemp(value, option)
+{
+    try
+    {
+        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+        def events = [[:]]
+       
+        def tempName = (UPPER_OVEN_RAW_TEMPERATURE == option) ? "upperRawTemp" : "lowerRawTemp"
+
+        if(2 == bytes.size())
+        {
+            events += [name: tempName, value: decodeErdInt(subBytes(bytes, 0, 2))]
+        }
+        
+        flushEvents(events)
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }
+}
+
+def parseTimerVal(value, option)
+{
+    try
+    {
+        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+        def events = [[:]]
+       
+        def timerName = (UPPER_OVEN_KITCHEN_TIMER == option) ? "upperTimer" : "lowerTimer"
+
+        if(2 == bytes.size())
+        {
+            events += [name: timerName, value: decodeErdInt(subBytes(bytes, 0, 2))]
+        }
+        
+        flushEvents(events)
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }
+}
+
+
+def parseCooktopStatus(value)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    
+    sendEvent(name: "cooktopStatus", value: ([0] == subBytes(bytes, 0, 1)) ? "off" : "on")
+}
+
+import groovy.transform.Field
+
+@Field Map knownModes = 
+    [
+        0: "off",
+        1: "preheat",
+        2: "convection preheat",
+        4: "convection roast preheat",
+        5: "bake",
+        7: "convection bake",
+        11: "convection roast",
+        12: "convection roast",
+        13: "broil low",
+        14: "broil high",
+        15: "convection broil high",
+        16: "convection broil low",
+        18: "warm"
+    ]
+
+@Field Map lightLevels =
+    [
+        0: "off",
+        1: "high",
+        2: "dim"
+    ]
+
+@Field ACTIVE_F_CODE_STATUS = "0x5005"
+@Field CONVECTION_CONVERSION = "0x5003"
+@Field ELAPSED_ON_TIME = "0x5004"
+@Field END_TONE = "0x5001"
+@Field HOUR_12_SHUTOFF_ENABLED = "0x5000"
+@Field KEY_PRESSED = "0x5006"
+@Field LIGHT_BAR = "0x5002"
+@Field LOWER_OVEN_AVAILABLE_COOK_MODES = "0x520b"
+@Field LOWER_OVEN_EXTENDED_COOK_MODES = "0x5213"
+@Field LOWER_OVEN_COOK_MODE = "0x5200"
+@Field LOWER_OVEN_COOK_TIME_REMAINING = "0x5204"
+@Field LOWER_OVEN_CURRENT_STATE = "0x5201"
+@Field LOWER_OVEN_DELAY_TIME_REMAINING = "0x5202"
+@Field LOWER_OVEN_DISPLAY_TEMPERATURE = "0x5209"
+@Field LOWER_OVEN_ELAPSED_COOK_TIME = "0x5208"
+@Field LOWER_OVEN_KITCHEN_TIMER = "0x5205"
+@Field LOWER_OVEN_PROBE_DISPLAY_TEMP = "0x5203"
+@Field LOWER_OVEN_PROBE_PRESENT = "0x5207"
+@Field LOWER_OVEN_REMOTE_ENABLED = "0x520a"
+@Field LOWER_OVEN_USER_TEMP_OFFSET = "0x5206"
+@Field LOWER_OVEN_WARMING_DRAWER_STATE = "0x520c"
+@Field LOWER_OVEN_RAW_TEMPERATURE = "0x520d"
+@Field LOWER_OVEN_LIGHT = "0x5211"
+@Field LOWER_OVEN_LIGHT_AVAILABILITY = "0x5212"
+@Field OVEN_CONFIGURATION = "0x5007"
+@Field OVEN_MODE_MIN_MAX_TEMP = "0x5008"
+@Field UPPER_OVEN_AVAILABLE_COOK_MODES = "0x510b"
+@Field UPPER_OVEN_EXTENDED_COOK_MODES = "0x5113"
+@Field UPPER_OVEN_COOK_MODE = "0x5100"
+@Field UPPER_OVEN_COOK_TIME_REMAINING = "0x5104"
+@Field UPPER_OVEN_CURRENT_STATE = "0x5101"
+@Field UPPER_OVEN_DELAY_TIME_REMAINING = "0x5102"
+@Field UPPER_OVEN_DISPLAY_TEMPERATURE = "0x5109"
+@Field UPPER_OVEN_ELAPSED_COOK_TIME = "0x5108"
+@Field UPPER_OVEN_KITCHEN_TIMER = "0x5105"
+@Field UPPER_OVEN_PROBE_DISPLAY_TEMP = "0x5103"
+@Field UPPER_OVEN_PROBE_PRESENT = "0x5107"
+@Field UPPER_OVEN_REMOTE_ENABLED = "0x510a"
+@Field UPPER_OVEN_USER_TEMP_OFFSET = "0x5106"
+@Field UPPER_OVEN_WARMING_DRAWER_STATE = "0x510c"
+@Field UPPER_OVEN_RAW_TEMPERATURE = "0x510d"
+@Field UPPER_OVEN_LIGHT = "0x5111"
+@Field UPPER_OVEN_LIGHT_AVAILABILITY = "0x5112"
+@Field WARMING_DRAWER_STATE = "0x5009"
+
+@Field COOKTOP_CONFIG = "0x551c"
+@Field COOKTOP_STATUS = "0x5520"
