@@ -2,7 +2,7 @@
 
 This provides various driver capabilities for SmartHQ appliances.  Note that all operations have a cloud (internet) interaction.
 
-This implementation is substantially based on and is mostly a direct port of this work:  https://github.com/simbaja/gehome
+This implementation is substantially based on and is mostly a direct port of this work:  [https://github.com/simbaja/gehome](https://github.com/simbaja/gehome/tree/6694bd75d79922d57d7b6460b9d60b5ace952b1e)
 
 Installing with Hubitat Package Manager (HPM) is recommended.
 
