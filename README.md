@@ -19,7 +19,8 @@ Install using HPM if you can.  If you must install manually, follow these steps:
 
 # Usage instructions:
 
-* Most of the commands and attributes are self explanatory.  Try things out!
+* Appliance updates will generally come automatically without polling.  But each appliance child device supports the `Refresh` command if you want to poll for current status.
+* Most of the other commands and attributes are self explanatory.  Try things out!
 * If you would like to request support for a new appliance type of additional attributes or commands:
     * Enable debug logging on the SmartHQ System device in Hubitat.
     * Open the *Logs* view in another browser tab or window and leave it open.
