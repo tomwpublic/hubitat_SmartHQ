@@ -198,7 +198,7 @@ def setIntegerErd(val, options, erd)
 {
     def intVal = options.find {val == it.value}?.key?.toInteger()
     
-    if(!intVal)
+    if(null == intVal)
     {
         // unsupported value sent, so discarding
         log.debug "invalid setting (${val})"
