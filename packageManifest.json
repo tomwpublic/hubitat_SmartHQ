@@ -51,7 +51,7 @@
     },
     {
       "id": "1769ef8b-8096-4bb2-891a-f5cf145a248f",
-      "name": "SmartHQ Dishwasher",
+      "name": "SmartHQ Portable AC",
       "namespace": "tomw",
       "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/devices/smartHQ_portableAC",
       "required": false
