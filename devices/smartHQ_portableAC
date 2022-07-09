@@ -208,8 +208,6 @@ def setIntegerErd(val, options, erd)
     def erdVal = encodeErdInt(intVal, 1)
     def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(erd, erdVal))
     
-    logDebug(erdMap)
-    
     parent?.sendWssMap(erdMap)     
 }
 
