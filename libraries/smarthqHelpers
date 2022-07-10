@@ -48,6 +48,11 @@ def decodeErdInt(byte[] val)
     return hubitat.helper.HexUtils.hexStringToInt(hubitat.helper.HexUtils.byteArrayToHexString(val))
 }
 
+def encodeErdInt(val, minBytes)
+{
+    return hubitat.helper.HexUtils.integerToHexString(val, minBytes)
+}
+
 def decodeErdSignedByte(byte val)
 {
     def intVal = decodeErdInt(val)
