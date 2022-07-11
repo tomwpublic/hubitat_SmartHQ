@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+0.9.2 - tomw - Make child logging follow system device setting
 0.9.0 - tomw - Initial release
 
 */
@@ -46,12 +47,9 @@ preferences
 #include tomw.smarthqHelpers
 #include tomw.wsReinitialize
 
-def logDebug(msg) 
+def isLogEnable()
 {
-    if (logEnable)
-    {
-        log.debug(msg)
-    }
+    return logEnable
 }
 
 def initialize()
@@ -228,7 +226,7 @@ def interpretResponse(msgJson)
                 break
             
             case ~/.*-setErd.*/:
-                // this is a response to setting an ERD.  ignore it.              
+                // this is a response to setting an ERD.  ignore it.
                 break
             
             default:
