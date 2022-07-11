@@ -20,6 +20,14 @@ import groovy.transform.Field
 @Field doorNormallyOpen      =  0x0001
 @Field doorNormallyClosed    =  0x0002
 
+def logDebug(msg)
+{
+    if (logEnable || parent?.isLogEnable())
+    {
+        log.debug(msg)
+    }
+}
+
 def setupDevDetails(details)
 {
     if(!details)
