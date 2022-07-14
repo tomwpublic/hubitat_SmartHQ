@@ -26,6 +26,7 @@ metadata
 {
     definition(name: "SmartHQ Microwave", namespace: "tomw", author: "tomw") 
     {
+        capability "Actuator"
         capability "ContactSensor"
         capability "Refresh"
         
