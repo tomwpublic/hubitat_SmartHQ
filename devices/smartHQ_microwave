@@ -18,7 +18,7 @@ limitations under the License.
 
 Change history:
 
-0.9.3 - tomw - Added support for Microwave
+0.9.3 - tomw - Added Microwave support.  Added Sabbath mode setting for refrigerator and oven.
 
 */
 
@@ -44,12 +44,18 @@ metadata
 
 def cookModeNames()
 {
-    cookModes.collect { it.value.toString() }
+    return cookModes.collect { it.value.toString() }
 }
 
 def cookStatusNames()
 {
-    cookStatuses.collect { it.value.toString() }    
+    def statuses = cookStatuses.collect { it.value.toString() }
+    
+    // remove a couple that aren't usable for commands
+    statuses.remove("completed")
+    statuses.remove("unknown")
+    
+    return statuses
 }
 
 def refresh()
@@ -106,7 +112,7 @@ def adjustMicrowaveState(state)
     refresh()
     pauseExecution(500)
     
-    def mode = cookModes.find { it.value == device.currentValue("cookMode") }?.key    
+    def mode = cookModes.find { it.value == device.currentValue("cookMode") }?.key
     if(null == mode)
     {
         return
