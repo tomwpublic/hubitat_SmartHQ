@@ -28,18 +28,14 @@ metadata
     {
         capability "ContactSensor"
         capability "Refresh"
-        capability "TemperatureMeasurement"
         
         command "adjustCookSetting", [[name: "powerLevel*", type: "NUMBER"], [name: "minutes*", type: "NUMBER"], [name: "seconds*", type: "NUMBER"]]
+        command "adjustMicrowaveState", [[name: "Cook status*", type:"ENUM", description:"Cook status mode to set", constraints: cookStatusNames()]]    
         
         attribute "cookMode", "enum" // cookModeNames() gives "Value too long for column" SQL error
         attribute "cookStatus", "enum", cookStatusNames()
         attribute "doorStatus", "enum", ["open", "closed"]
-        attribute "minutes", "number"
         attribute "powerLevel", "number"
-        attribute "seconds", "number"
-        attribute "temperature", "number"
-        
     }
 }
 
@@ -75,14 +71,6 @@ def parse(item)
         case MICROWAVE_STATE:
             parseMicrowaveState(item.value)
             break
-        
-        case MICROWAVE_COOK_SETTING:
-            parseMicrowaveCookSetting(item.value)
-            break
-        
-        case MICROWAVE_COOK_TIMER:
-            parseMicrowaveCookTimer(item.value)
-            break
     }
 }
 
@@ -108,48 +96,48 @@ def parseMicrowaveState(value)
     }  
 }
 
-def parseMicrowaveCookSetting(value)
+def adjustMicrowaveState(state)
 {
-    try
+    def status = cookStatuses.find { it.value == state }?.key
+    
+    if(null == status)
     {
-        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)      
-        
-        sendEvent(name: "powerLevel", value: decodeErdInt(subBytes(bytes, 0, 1)))
-        
-        if("on" != device.currentValue("cookStatus"))
-        {
-            // the cook times in this message seem to always return zeroes while the cook is running
-            //   ...so, ignore them if we're in the "on" cookStatus
-            parseMicrowaveCookTimer(hubitat.helper.HexUtils.byteArrayToHexString(subBytes(bytes, 1, 2)))
-        }
+        return
     }
-    catch (Exception e)
+    
+    // update other attributes...
+    refresh()
+    pauseExecution(500)
+    
+    def mode = cookModes.find { it.value == device.currentValue("cookMode") }?.key    
+    if(null == mode)
     {
-        logDebug("parse error: ${e.message}")
-    }  
-}
-
-def parseMicrowaveCookTimer(value)
-{
-    try
-    {
-        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)      
-        
-        sendEvent(name: "minutes", value: decodeErdInt(subBytes(bytes, 0, 1)))
-        sendEvent(name: "seconds", value: decodeErdInt(subBytes(bytes, 1, 1)))
+        return
     }
-    catch (Exception e)
-    {
-        logDebug("parse error: ${e.message}")
-    }  
+    
+    def door = (device.currentValue("doorStatus") == "open") ? 1 : 0
+    def pl = device.currentValue("powerLevel").toInteger()
+    def temp = "0000"
+    
+    // ...then build message
+    def value = 
+        encodeErdInt(status, 1) +
+        encodeErdInt(mode, 1) +
+        encodeErdInt(door, 1) +
+        encodeErdInt(pl, 1) +
+        temp
+    
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(MICROWAVE_STATE, value))
+    
+    log.debug erdMap
+    
+    parent?.sendWssMap(erdMap)
 }
 
 def adjustCookSetting(power, minutes, seconds)
 {
     def value = encodeErdInt(power.toInteger(), 1) + encodeErdInt(minutes.toInteger(), 1) + encodeErdInt(seconds.toInteger(), 1)
     def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(MICROWAVE_COOK_SETTING, value))
-    
-    log.debug erdMap
     
     parent?.sendWssMap(erdMap)
 }
