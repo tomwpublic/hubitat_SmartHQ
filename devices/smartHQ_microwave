@@ -132,8 +132,6 @@ def adjustMicrowaveState(state)
     
     def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(MICROWAVE_STATE, value))
     
-    log.debug erdMap
-    
     parent?.sendWssMap(erdMap)
 }
 
