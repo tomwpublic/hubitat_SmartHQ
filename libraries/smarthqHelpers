@@ -68,10 +68,16 @@ def decodeErdSignedByte(byte val)
     return (intVal <= 128) ? intVal : (intVal - 256) 
 }
 
+def encodeErdBool(boolean val)
+{
+    def intVal = (true == val) ? 1 : 0
+    return encodeErdInt(intVal, 1)
+}
+
 def encodeErdSignedByte(val)
 {
     val = (val < 0) ? (val + 256) : val
-    return hubitat.helper.HexUtils.integerToHexString(val, 1)    
+    return hubitat.helper.HexUtils.integerToHexString(val, 1)
 }
 
 def refreshAppliance()
@@ -224,3 +230,28 @@ def doorNOStatus(val)
             return "NA"
     }    
 }
+
+def setBooleanErd(erd, boolean value)
+{
+    def strVal = encodeErdBool(value)
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(erd, strVal))
+    
+    parent?.sendWssMap(erdMap)
+}
+
+def setSabbathMode(value)
+{
+    def boolVal = (value == "true")
+    setBooleanErd(SABBATH_MODE, boolVal)
+}
+
+@Field APPLIANCE_TYPE = "0x0008"
+@Field CLOCK_FORMAT = "0x0006"
+@Field CLOCK_TIME = "0x0005"
+@Field MODEL_NUMBER = "0x0001"
+@Field SABBATH_MODE = "0x0009"
+@Field SERIAL_NUMBER = "0x0002"
+@Field SOUND_LEVEL = "0x000a"
+@Field TEMPERATURE_UNIT = "0x0007"
+@Field USER_INTERFACE_LOCKED = "0x0004"
+@Field UNIT_TYPE = "0x0035"

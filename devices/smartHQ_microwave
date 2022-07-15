@@ -1,0 +1,212 @@
+/*
+
+Copyright 2022 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.9.3 - tomw - Added Microwave support.  Added Sabbath mode setting for refrigerator and oven.
+
+*/
+
+metadata 
+{
+    definition(name: "SmartHQ Microwave", namespace: "tomw", author: "tomw") 
+    {
+        capability "Actuator"
+        capability "ContactSensor"
+        capability "Refresh"
+        
+        command "adjustCookSetting", [[name: "powerLevel*", type: "NUMBER"], [name: "minutes*", type: "NUMBER"], [name: "seconds*", type: "NUMBER"]]
+        command "adjustMicrowaveState", [[name: "Cook status*", type:"ENUM", description:"Cook status mode to set", constraints: cookStatusNames()]]    
+        
+        attribute "cookMode", "enum" // cookModeNames() gives "Value too long for column" SQL error
+        attribute "cookStatus", "enum", cookStatusNames()
+        attribute "doorStatus", "enum", ["open", "closed"]
+        attribute "powerLevel", "number"
+    }
+}
+
+#include tomw.smarthqHelpers
+
+def cookModeNames()
+{
+    return cookModes.collect { it.value.toString() }
+}
+
+def cookStatusNames()
+{
+    def statuses = cookStatuses.collect { it.value.toString() }
+    
+    // remove a couple that aren't usable for commands
+    statuses.remove("completed")
+    statuses.remove("unknown")
+    
+    return statuses
+}
+
+def refresh()
+{
+    refreshAppliance()
+}
+
+def parse(item)
+{
+    if(!item)
+    {
+        return
+    }
+    
+    logDebug(item)
+    
+    def switchVal = item.erd?.toLowerCase()
+    switch(switchVal)
+    {
+        case MICROWAVE_STATE:
+            parseMicrowaveState(item.value)
+            break
+    }
+}
+
+def parseMicrowaveState(value)
+{
+    try
+    {
+        def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)        
+        
+        sendEvent(name: "cookStatus", value: cookStatuses[decodeErdInt(subBytes(bytes, 0, 1))] ?: "unknown")
+        sendEvent(name: "cookMode", value: cookModes[decodeErdInt(subBytes(bytes, 1, 1))] ?: "unknown")
+        parseDoorStatusByte(value.substring(4,6), doorNormallyClosed)
+        sendEvent(name: "powerLevel", value: decodeErdInt(subBytes(bytes, 3, 1)))
+        
+    }
+    catch (Exception e)
+    {
+        logDebug("parse error: ${e.message}")
+    }  
+}
+
+def adjustMicrowaveState(state)
+{
+    def status = cookStatuses.find { it.value == state }?.key
+    
+    if(null == status)
+    {
+        return
+    }
+    
+    // update other attributes...
+    refresh()
+    pauseExecution(500)
+    
+    def mode = cookModes.find { it.value == device.currentValue("cookMode") }?.key
+    if(null == mode)
+    {
+        return
+    }
+    
+    def door = (device.currentValue("doorStatus") == "open") ? 1 : 0
+    def pl = device.currentValue("powerLevel").toInteger()
+    def temp = "0000"
+    
+    // ...then build message
+    def value = 
+        encodeErdInt(status, 1) +
+        encodeErdInt(mode, 1) +
+        encodeErdInt(door, 1) +
+        encodeErdInt(pl, 1) +
+        temp
+    
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(MICROWAVE_STATE, value))
+    
+    log.debug erdMap
+    
+    parent?.sendWssMap(erdMap)
+}
+
+def adjustCookSetting(power, minutes, seconds)
+{
+    def value = encodeErdInt(power.toInteger(), 1) + encodeErdInt(minutes.toInteger(), 1) + encodeErdInt(seconds.toInteger(), 1)
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(MICROWAVE_COOK_SETTING, value))
+    
+    parent?.sendWssMap(erdMap)
+}
+
+import groovy.transform.Field
+
+@Field Map cookModes =
+    [
+        0: "no_mode",
+        1: "timed",
+        2: "popcorn",
+        3: "potato",
+        4: "frozen_vegetables",
+        5: "fresh_vegetables",
+        6: "pizza",
+        7: "reheat",
+        8: "dinner_plate",
+        9: "beverage",
+        0xA: "defrost_by_weight",
+        0xB: "defrost_by_time",
+        0xC: "warm",
+        0xD: "convection_bake",
+        0xE: "convection_roast",
+        0xF: "broil",
+        0x10: "sensor_cook",
+        0x11: "auto_roast",
+        0x12: "auto_bake",
+        0x13: "auto_defrost",
+        0xFF: "dash"
+    ]
+
+@Field Map cookStatuses =
+    [
+        0: "off",
+        1: "on",
+        2: "paused",
+        3: "completed",
+        0xFF: "unknown"
+    ]
+
+@Field MICROWAVE_RECIPE_STATUS = "0x5300"
+@Field MICROWAVE_COOK_SETTING = "0x5c00" 
+@Field MICROWAVE_AVAILABLE_MODES = "0x5c01"
+@Field MICROWAVE_UNKNOWN_5C02 = "0x5c02"
+@Field MICROWAVE_UNKNOWN_5C03 = "0x5c03"
+@Field MICROWAVE_UNKNOWN_5C04 = "0x5c04"
+@Field MICROWAVE_UNKNOWN_5C05 = "0x5c05"
+@Field MICROWAVE_UNKNOWN_5C0A = "0x5c0a"
+@Field MICROWAVE_UNKNOWN_5C0B = "0x5c0b"
+@Field MICROWAVE_UNKNOWN_5C0C = "0x5c0c"
+@Field MICROWAVE_UNKNOWN_5C0D = "0x5c0d"
+@Field MICROWAVE_UNKNOWN_5C0E = "0x5c0e"
+@Field MICROWAVE_UNKNOWN_5C0F = "0x5c0f"
+@Field MICROWAVE_UNKNOWN_5C10 = "0x5c10"
+@Field MICROWAVE_STATE = "0x5c11"
+@Field MICROWAVE_UNKNOWN_5C12 = "0x5c12"
+@Field MICROWAVE_UNKNOWN_5C13 = "0x5c13"
+@Field MICROWAVE_REMOTE_ENABLE = "0x5c14"
+@Field MICROWAVE_COOK_TIMER = "0x5c15"
+@Field MICROWAVE_UNKNOWN_5C16 = "0x5c16"
+@Field MICROWAVE_UNKNOWN_5C17 = "0x5c17"
+@Field MICROWAVE_UNKNOWN_5C18 = "0x5c18"
+@Field MICROWAVE_KITCHEN_TIMER = "0x5c19"
+@Field MICROWAVE_COOK_TIME_SETTING_MODIFICATION = "0x5c1a"
+@Field MICROWAVE_UNKNOWN_5C1B = "0x5c1b"
+@Field MICROWAVE_UNKNOWN_5C1E = "0x5c1e"
+@Field MICROWAVE_UNKNOWN_5C20 = "0x5c20"
+@Field MICROWAVE_UNKNOWN_5C2C = "0x5c2c"
+@Field MICROWAVE_UNKNOWN_5C2E = "0x5c2e"
