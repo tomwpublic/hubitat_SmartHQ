@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+0.9.4 - tomw - Improved air conditioner support.
 0.9.2 - tomw - Make child logging follow system device setting
 0.9.1 - tomw - Added support for Portable AC
 
