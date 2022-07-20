@@ -163,6 +163,10 @@ def manageChildDevice(id, details = null)
             case "Clothes Washer":
             case "Clothes Dryer":
                 details.type = "Laundry"
+                break
+            case "Air Conditioner":
+                details.type = "Portable AC"
+                break
         }
         
         def devDetails = [label: details.nickname ?: details.type, isComponent:false, name:childDni(id), devType: "SmartHQ " + details.type, mac: id]        
