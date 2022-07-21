@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+0.9.4 - tomw - Improved air conditioner support.
 0.9.2 - tomw - Make child logging follow system device setting
 0.9.1 - tomw - Added support for Portable AC
 
@@ -31,6 +32,9 @@ metadata
         capability "Refresh"
         capability "RelaySwitch"
         capability "Switch"
+        capability "TemperatureMeasurement"
+        capability "ThermostatCoolingSetpoint"
+        capability "ThermostatFanMode"
         capability "ThermostatOperatingState"
         capability "ThermostatSetpoint"
         
@@ -38,10 +42,14 @@ metadata
         command "setOperatingMode", [[name: "Operating mode*", type:"ENUM", description:"Operating mode to set", constraints: operationModeNames()]]    
         
         // overriding default options for setSpeed
-        command "setSpeed", [[name: "Fan speed*", type:"ENUM", description:"Fan speed to set", constraints: fanModeNames()]]        
+        command "setSpeed", [[name: "Fan speed*", type:"ENUM", description:"Fan speed to set", constraints: fanModeNames()]]
+        // overriding default options for setThermostatFanMode
+        command "setThermostatFanMode", [[name: "Fan speed*", type:"ENUM", description:"Fan speed to set", constraints: fanModeNames()]]
         
         attribute "currentTemp", "number"
+        attribute "filterStatus", "string"
         attribute "supportedOperatingModes", "enum"
+        attribute "supportedThermostatFanModes", "enum"
     }
 }
 
@@ -57,15 +65,19 @@ def operationModeNames()
     operationModes.collect { it.value.toString() }    
 }
 
-def installed()
+def refresh()
 {
     sendEvent(name: "supportedFanSpeeds", value: fanModeNames())
     sendEvent(name: "supportedOperatingModes", value: operationModeNames())
+    sendEvent(name: "supportedThermostatFanModes", value: fanModeNames())
+    
+    refreshAppliance()
 }
 
-def refresh()
+def setCoolingSetpoint(temp)
 {
-    refreshAppliance()
+    adjustSetpoint(temp)
+    setOperatingMode("cool")    
 }
 
 def parse(item)
@@ -96,6 +108,11 @@ def parse(item)
         case AC_OPERATION_MODE:
             parseOperatingMode(item.value)
             break
+        
+        case AC_FILTER_STATUS:
+            def filterVal = decodeErdInt(hubitat.helper.HexUtils.hexStringToByteArray(item.value))
+            sendEvent(name: "filterStatus", value: filterVal ? "clean" : "ok")
+            break
     }
 }
 
@@ -118,19 +135,21 @@ def parseTemp(value, option)
     {
         def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
         
-        def eventName = ""
+        def eventNames = []
         switch(option)
         {
             case AC_AMBIENT_TEMPERATURE:
-                eventName = "currentTemp"
+                eventNames += "currentTemp"
+                eventNames += "temperature"
                 break
             
             case AC_TARGET_TEMPERATURE:
-                eventName = "thermostatSetpoint"
+                eventNames += "thermostatSetpoint"
+                eventNames += "coolingSetpoint"
                 break
         }
-        
-        sendEvent(name: eventName, value: decodeErdInt(bytes))
+
+        eventNames.each{ sendEvent(name: it, value: decodeErdInt(bytes)) }
     }
     catch (Exception e)
     {
@@ -207,6 +226,26 @@ def setIntegerErd(val, options, erd)
     parent?.sendWssMap(erdMap)     
 }
 
+def fanAuto()
+{
+    setSpeed("auto")
+}
+
+def fanCirculate()
+{
+    fanAuto()
+}
+
+def fanOn()
+{
+    fanAuto()    
+}
+
+def setThermostatFanMode(fanmode)
+{
+    setSpeed(fanmode)    
+}
+
 def setSpeed(fanspeed)
 {
     setIntegerErd(fanspeed, fanSettings, AC_FAN_SETTING)    
@@ -229,9 +268,9 @@ import groovy.transform.Field
         0: "cool",
         1: "fan_only",
         2: "energy_saver",
-        3: "heat",
+        //3: "heat",
         4: "dry",
-        5: "auto",
+        //5: "auto",
         9: "default"
     ]
 
@@ -240,11 +279,11 @@ import groovy.transform.Field
         0: "default",
         1: "auto",
         2: "low",
-        3: "low_auto",
+        //3: "low_auto",
         4: "medium",
-        5: "med_auto",
+        //5: "med_auto",
         8: "high",
-        9: "high_auto"
+        //9: "high_auto"
     ]
 
 @Field AC_TARGET_TEMPERATURE = "0x7003"

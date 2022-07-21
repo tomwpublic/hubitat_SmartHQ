@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+0.9.4 - tomw - Improved air conditioner support.
 0.9.2 - tomw - Make child logging follow system device setting
 0.9.0 - tomw - Initial release
 
@@ -163,6 +164,10 @@ def manageChildDevice(id, details = null)
             case "Clothes Washer":
             case "Clothes Dryer":
                 details.type = "Laundry"
+                break
+            case "Air Conditioner":
+                details.type = "Portable AC"
+                break
         }
         
         def devDetails = [label: details.nickname ?: details.type, isComponent:false, name:childDni(id), devType: "SmartHQ " + details.type, mac: id]        
