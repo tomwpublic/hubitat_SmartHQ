@@ -27,10 +27,16 @@ metadata
 {
     definition(name: "SmartHQ Laundry", namespace: "tomw", author: "tomw") 
     {
+        capability "Actuator"
         capability "ContactSensor"
         capability "Refresh"
         
+        attribute "delayRemaining", "number"
+        attribute "doorLock", "enum", ["unlocked", "locked"]
         attribute "doorStatus", "enum", ["open", "closed"]
+        attribute "machineState", "string"
+        attribute "smartDispenseTankStatus", "string"
+        attribute "timeRemaining", "number"
     }
 }
 
@@ -55,10 +61,73 @@ def parse(item)
         case LAUNDRY_DOOR:
             parseDoorStatusByte(item.value, doorNormallyOpen)
             break
+        
+        case LAUNDRY_TIME_REMAINING:
+            def timeRemMins = (decodeErdInt(hubitat.helper.HexUtils.hexStringToByteArray(item.value)) / 60).toInteger()
+            sendEvent(name: "timeRemaining", value: timeRemMins)
+            break
+        
+        case LAUNDRY_MACHINE_STATE:
+            parseMachineState(item.value)
+            break
+        
+        case LAUNDRY_WASHER_DOOR_LOCK:
+            parseDoorLock(item.value)
+            break
+        
+        case LAUNDRY_DELAY_TIME_REMAINING:
+            def timeRemMins = decodeErdInt(hubitat.helper.HexUtils.hexStringToByteArray(item.value))
+            sendEvent(name: "delayRemaining", value: timeRemMins)
+            break
+        
+        case LAUNDRY_WASHER_SMART_DISPENSE_TANK_STATUS:
+            parseSmartDispenseTankStatus(item.value)
+            break
     }
 }
 
+def parseMachineState(value)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)    
+    sendEvent(name: "machineState", value: machineStates[decodeErdInt(subBytes(bytes, 0, 1))] ?: "unknown")
+}
+
+def parseDoorLock(value)
+{
+    def doorLock = decodeErdBool(hubitat.helper.HexUtils.hexStringToByteArray(value)?.getAt(0)) ? "locked" : "unlocked"
+    sendEvent(name: "doorLock", value: doorLock)    
+}
+
+def parseSmartDispenseTankStatus(value)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)    
+    sendEvent(name: "smartDispenseTankStatus", value: smartDispenseTankStatuses[decodeErdInt(subBytes(bytes, 0, 1))] ?: "unknown")
+}
+
 import groovy.transform.Field
+
+@Field Map machineStates = 
+    [
+        0: "idle",
+        1: "standby",
+        2: "run",
+        3: "pause",
+        4: "end_of_cycle",
+        5: "dsm_delay_run",
+        6: "delay_run",
+        7: "delay_pause",
+        8: "drain_timeout",
+        9: "commissioning",
+        10: "bulk_flush",
+        128: "clean_speak"
+    ]
+
+@Field Map smartDispenseTankStatuses =
+    [
+        2: "full",
+        1: "low",
+        0: "unknown"
+    ]
 
 @Field LAUNDRY_MACHINE_STATE = "0x2000"
 @Field LAUNDRY_SUB_CYCLE = "0x2001"
