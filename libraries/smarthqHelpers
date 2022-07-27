@@ -74,6 +74,11 @@ def encodeErdBool(boolean val)
     return encodeErdInt(intVal, 1)
 }
 
+def decodeErdBool(byte val)
+{
+    return (val == 0x00) ? false : true
+}
+
 def encodeErdSignedByte(val)
 {
     val = (val < 0) ? (val + 256) : val
