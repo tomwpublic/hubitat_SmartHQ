@@ -209,23 +209,6 @@ def setPowerStatus(boolean mode)
     parent?.sendWssMap(erdMap)    
 }
 
-def setIntegerErd(val, options, erd)
-{
-    def intVal = options.find {val == it.value}?.key?.toInteger()
-    
-    if(null == intVal)
-    {
-        // unsupported value sent, so discarding
-        log.debug "invalid setting (${val})"
-        return
-    }
-    
-    def erdVal = encodeErdInt(intVal, 1)
-    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(erd, erdVal))
-    
-    parent?.sendWssMap(erdMap)     
-}
-
 def fanAuto()
 {
     setSpeed("auto")
