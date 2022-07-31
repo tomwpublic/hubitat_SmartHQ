@@ -30,7 +30,8 @@ metadata
         capability "ContactSensor"
         capability "Refresh"
         
-        command "adjustUserSetting", [[name: "cycleMode*", type: "ENUM", constraints: userCycleNames()], [name: "delayHours*", type: "NUMBER"], [name: "sound*", type: "ENUM", constraints: userSettingNames()]]
+        command "setSabbathMode", [[name: "Sabbath mode enable?*", type:"ENUM", constraints: [true, false]]]
+        command "setSoundLevel", [[name: "Sound level setting (0-3)", type:"NUMBER"]]
         
         attribute "cycleMode", "string"
         attribute "cycleName", "string"
@@ -44,16 +45,6 @@ metadata
 }
 
 #include tomw.smarthqHelpers
-
-def userSettingNames()
-{
-    return UserSetting.collect { it.value.toString() }
-}
-
-def userCycleNames()
-{
-    return UserCycleSetting.collect { it.value.toString() }
-}
 
 def refresh()
 {
@@ -101,21 +92,23 @@ def parseCycleState(value)
 {
     def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
     
-    sendEvent(name: "cycleState", value: knownStates[decodeErdInt(subBytes(bytes, 0, 1))] ?: "unknown")
+    def cState = knownStates[decodeErdInt(subBytes(bytes, 0, 1))]
+    
+    sendEvent(name: "cycleState", value: (null != cState) ? cState : "unknown")
 }
 
 def parseMode(value)
 {
     def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
     
-    sendEvent(name: "mode", value: knownModes[decodeErdInt(subBytes(bytes, 0, 1))] ?: "unknown")
+    def mode = knownModes[decodeErdInt(subBytes(bytes, 0, 1))]
+    
+    sendEvent(name: "mode", value: (null != mode) ? mode : "unknown")
 }
 
 def parseUserSetting(value)
 {
     value = decodeErdInt(hubitat.helper.HexUtils.hexStringToByteArray(value))
-    
-    setUserSetting(value)
     
     def bottle_jet = UserSetting.getAt(value & 1)
     def cycleMode = UserCycleSetting.getAt((value & 0x0E) >> 1)
@@ -126,48 +119,15 @@ def parseUserSetting(value)
     def wash_temp = UserWashTempSetting.getAt((value & 0x3000) >> 12)
     def delay_hours = ((value & 0xF0000) >> 16)
     def wash_zone = UserWashZoneSetting.getAt((value & 0x300000) >> 20)
-    def sound = UserSetting.getAt((value & 0x800000) >> 13)
+    def sound = erdSoundLevels[((value & 0x800000) >> 13)]
     
     def events = [[:]]
     
     events += [name: "cycleMode", value: cycleMode]
     events += [name: "delayHours", value: delay_hours]
-    events += [name: "sound", value: sound]
+    events += [name: "sound", value: (null != sound) ? sound : "unknown"]
     
     flushEvents(events)
-}
-
-def adjustUserSetting(cycleMode, delayHours, sound)
-{
-    refresh()
-    pauseExecution(500)
-    
-    def setting = getUserSetting()
-    
-    cycleMode = UserCycleSetting.find { it.value == cycleMode }?.key
-    sound = UserSetting.find { it.value == sound }?.key
-    
-    cycleMode = (cycleMode & 0x7) << 1
-    delayHours = (delayHours.toInteger() & 0xF) << 16
-    sound = (sound & 0x1) << 13
-    
-    setting |= (cycleMode | delayHours | sound)
-    
-    def value = encodeErdInt(setting, 3)
-    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(DISHWASHER_USER_SETTING, value))
-    
-    logDebug erdMap
-    parent?.sendWssMap(erdMap)
-}
-
-def setUserSetting(setting)
-{
-    state.us = setting
-}
-
-def getUserSetting()
-{
-    return state.us
 }
 
 import groovy.transform.Field
