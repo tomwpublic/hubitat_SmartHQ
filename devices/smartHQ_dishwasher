@@ -31,7 +31,7 @@ metadata
         capability "Refresh"
         
         command "setSabbathMode", [[name: "Sabbath mode enable?*", type:"ENUM", constraints: [true, false]]]
-        command "setSoundLevel", [[name: "Sound level setting (0-3)", type:"NUMBER"]]
+        command "setSoundLevel", [[name: "Sound level setting*", type:"ENUM", constraints: soundLevelNames()]]
         
         attribute "cycleMode", "string"
         attribute "cycleName", "string"
