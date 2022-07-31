@@ -272,6 +272,11 @@ def setSoundLevel(value)
     setIntegerErd(value, erdSoundLevels, SOUND_LEVEL)
 }
 
+def soundLevelNames()
+{
+    erdSoundLevels.collect { it.value.toString() }    
+}
+
 @Field Map erdSoundLevels =
     [
         0: "off",
