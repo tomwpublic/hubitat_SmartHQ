@@ -31,7 +31,7 @@ metadata
         capability "Refresh"
         
         command "setSabbathMode", [[name: "Sabbath mode enable?*", type:"ENUM", constraints: [true, false]]]
-        command "setSoundLevel", [[name: "Sound level setting*", type:"ENUM", constraints: soundLevelNames()]]
+        command "setSoundLevel", [[name: "Sound level setting*", type:"ENUM", constraints: [true, false]]]
         
         attribute "cycleMode", "string"
         attribute "cycleName", "string"
@@ -119,7 +119,7 @@ def parseUserSetting(value)
     def wash_temp = UserWashTempSetting.getAt((value & 0x3000) >> 12)
     def delay_hours = ((value & 0xF0000) >> 16)
     def wash_zone = UserWashZoneSetting.getAt((value & 0x300000) >> 20)
-    def sound = erdSoundLevels[((value & 0x800000) >> 13)]
+    def sound = UserSetting.getAt((value & 0x800000) >> 23)
     
     def events = [[:]]
     
