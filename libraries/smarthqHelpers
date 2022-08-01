@@ -250,6 +250,12 @@ def setSabbathMode(value)
     setBooleanErd(SABBATH_MODE, boolVal)
 }
 
+def setSoundLevel(value)
+{
+    def boolVal = (value == "true")
+    setBooleanErd(SOUND_LEVEL, boolVal)
+}
+
 def setIntegerErd(val, options, erd)
 {
     def intVal = options.find {val == it.value}?.key?.toInteger()
@@ -266,24 +272,6 @@ def setIntegerErd(val, options, erd)
     
     parent?.sendWssMap(erdMap)     
 }
-
-def setSoundLevel(value)
-{
-    setIntegerErd(value, erdSoundLevels, SOUND_LEVEL)
-}
-
-def soundLevelNames()
-{
-    erdSoundLevels.collect { it.value.toString() }    
-}
-
-@Field Map erdSoundLevels =
-    [
-        0: "off",
-        1: "low",
-        2: "standard",
-        3: "high"
-    ]
 
 @Field APPLIANCE_TYPE = "0x0008"
 @Field CLOCK_FORMAT = "0x0006"
