@@ -119,7 +119,7 @@ def parseUserSetting(value)
     def wash_temp = UserWashTempSetting.getAt((value & 0x3000) >> 12)
     def delay_hours = ((value & 0xF0000) >> 16)
     def wash_zone = UserWashZoneSetting.getAt((value & 0x300000) >> 20)
-    def sound = UserSetting.getAt((value & 0x800000) >> 23)
+    def sound = SoundSetting.getAt((value & 0x800000) >> 23)
     
     def events = [[:]]
     
@@ -165,7 +165,10 @@ import groovy.transform.Field
     ]
 
 @Field Map UserSetting =
-    [ 0: "disable", 1: "enable", 0xFF: "invalid" ]
+    [ 0: "disabled", 1: "enabled", 0xFF: "invalid" ]
+
+@Field Map SoundSetting =
+    [ 0: "enabled", 1: "disabled", 0xFF: "invalid" ]
 
 @Field Map UserCycleSetting =
     [
