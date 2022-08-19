@@ -164,6 +164,7 @@ def parseOperatingMode(value)
     {
         def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
         sendEvent(name: "thermostatOperatingState", value: operationModes[decodeErdInt(bytes[0]).toInteger()])
+        sendEvent(name: "thermostatMode", value: operationModes[decodeErdInt(bytes[0]).toInteger()])
     }
     catch (Exception e)
     {
@@ -194,12 +195,18 @@ def adjustSetpoint(temp)
 
 def on()
 {
-    setPowerStatus(true)    
+    setPowerStatus(true)
+    
+    sendEvent(name: "thermostatOperatingState", value: "cooling")
+    sendEvent(name: "thermostatMode", value: "on")
 }
 
 def off()
 {
-    setPowerStatus(false)    
+    setPowerStatus(false)
+    
+    sendEvent(name: "thermostatOperatingState", value: "idle")
+    sendEvent(name: "thermostatMode", value: "off")
 }
 
 def setPowerStatus(boolean mode)
