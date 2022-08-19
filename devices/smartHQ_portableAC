@@ -35,11 +35,12 @@ metadata
         capability "TemperatureMeasurement"
         capability "ThermostatCoolingSetpoint"
         capability "ThermostatFanMode"
+        capability "ThermostatMode"
         capability "ThermostatOperatingState"
         capability "ThermostatSetpoint"
         
         command "adjustSetpoint", ["number"]
-        command "setOperatingMode", [[name: "Operating mode*", type:"ENUM", description:"Operating mode to set", constraints: operationModeNames()]]    
+        command "setThermotstatMode", [[name: "Operating mode*", type:"ENUM", description:"Operating mode to set", constraints: operationModeNames()]]    
         
         // overriding default options for setSpeed
         command "setSpeed", [[name: "Fan speed*", type:"ENUM", description:"Fan speed to set", constraints: fanModeNames()]]
@@ -48,7 +49,7 @@ metadata
         
         attribute "currentTemp", "number"
         attribute "filterStatus", "string"
-        attribute "supportedOperatingModes", "enum"
+        attribute "supportedThermostatModes", "enum"
         attribute "supportedThermostatFanModes", "enum"
     }
 }
@@ -68,7 +69,7 @@ def operationModeNames()
 def refresh()
 {
     sendEvent(name: "supportedFanSpeeds", value: fanModeNames())
-    sendEvent(name: "supportedOperatingModes", value: operationModeNames())
+    sendEvent(name: "supportedThermostatModes", value: operationModeNames())
     sendEvent(name: "supportedThermostatFanModes", value: fanModeNames())
     
     refreshAppliance()
@@ -77,7 +78,7 @@ def refresh()
 def setCoolingSetpoint(temp)
 {
     adjustSetpoint(temp)
-    setOperatingMode("cool")    
+    cool()  
 }
 
 def parse(item)
@@ -251,9 +252,36 @@ def setSpeed(fanspeed)
     setIntegerErd(fanspeed, fanSettings, AC_FAN_SETTING)    
 }
 
-def setOperatingMode(opMode)
+def setThermostatMode(opMode)
 {
+    if(opMode == "off")
+    {
+        // special handling since "off" isn't in the enum map
+        off()
+        return
+    }
+    
     setIntegerErd(opMode, operationModes, AC_OPERATION_MODE) 
+}
+
+def auto()
+{
+    logDebug("auto() not supported")
+}
+
+def cool()
+{
+    setThermostatMode("cool")
+}
+
+def emergencyHeat()
+{
+    logDebug("emergencyHeat() not supported")
+}
+
+def heat()
+{
+    logDebug("heat() not supported")
 }
 
 def cycleSpeed()
