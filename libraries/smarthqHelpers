@@ -250,6 +250,29 @@ def setSabbathMode(value)
     setBooleanErd(SABBATH_MODE, boolVal)
 }
 
+def setSoundLevel(value)
+{
+    def boolVal = (value == "true")
+    setBooleanErd(SOUND_LEVEL, boolVal)
+}
+
+def setIntegerErd(val, options, erd)
+{
+    def intVal = options.find {val == it.value}?.key?.toInteger()
+    
+    if(null == intVal)
+    {
+        // unsupported value sent, so discarding
+        log.debug "invalid setting (${val})"
+        return
+    }
+    
+    def erdVal = encodeErdInt(intVal, 1)
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(erd, erdVal))
+    
+    parent?.sendWssMap(erdMap)     
+}
+
 @Field APPLIANCE_TYPE = "0x0008"
 @Field CLOCK_FORMAT = "0x0006"
 @Field CLOCK_TIME = "0x0005"
