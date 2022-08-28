@@ -1,0 +1,172 @@
+/*
+
+Copyright 2022 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.9.8 - tomw - Home Water Filter suppport.
+0.9.3 - tomw - Added Microwave support.  Added Sabbath mode setting for refrigerator and oven.
+0.9.2 - tomw - Make child logging follow system device setting
+0.9.0 - tomw - Initial release
+
+*/
+
+metadata 
+{
+    definition(name: "SmartHQ Home Water Filter", namespace: "tomw", author: "tomw") 
+    {
+        capability "Actuator"
+        capability "FilterStatus"
+        capability "Refresh"
+        capability "Valve"        
+        
+        // descriptive names for open/close Valve commmands
+        command "open", [[name: "Select FILTERED mode"]]
+        command "close", [[name: "Select OFF mode"]]
+        // custom command to augment open/close with additional mode        
+        command "bypass", [[name: "Select BYPASS mode"]]        
+        
+        attribute "filterLife", "number" 
+        attribute "filterMode", "string"               
+        attribute "position", "string"
+        
+        attribute "desiredValveState", "string"
+        attribute "valveState", "string"
+    }
+}
+
+#include tomw.smarthqHelpers
+
+def refresh()
+{
+    refreshAppliance()
+}
+
+def parse(item)
+{
+    if(!item)
+    {
+        return
+    }
+    
+    logDebug(item)
+    
+    def switchVal = item.erd?.toLowerCase()
+    switch(switchVal)
+    {
+        case WH_FILTER_VALVE_STATE:
+            vState = parseOptionVal(item.value, "valveState", knownValveStates)
+        
+            valve = ["bypass", "filtered", "manual override", "driving"].contains(vState) ? "open" : "closed"
+            sendEvent(name: "valve", value: valve)        
+            break
+        
+        case WH_FILTER_MODE:
+            parseOptionVal(item.value, "filterMode", knownFilterModes)
+            break
+        
+        case WH_FILTER_POSITION:
+            parseOptionVal(item.value, "position", knownPositions)
+            break
+        
+        case WH_FILTER_LIFE_REMAINING:
+            fBytes = hubitat.helper.HexUtils.hexStringToByteArray(item.value)
+            filterLife = decodeErdInt(subBytes(fBytes, 0, 4))
+            // if less than 5% remaining, mark as "replace"
+            sendEvent(name: "filterStatus", value: (filterLife < 5) ? "replace" : "normal")
+            sendEvent(name: "filterLife", value: filterLife)
+            break
+    }
+}
+
+def parseOptionVal(value, attrName, options)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    
+    def vState = options.getAt(decodeErdInt(subBytes(bytes, 0, 1)))    
+    sendEvent(name: attrName, value: (null != vState) ? vState : "unknown")
+    
+    return vState
+}
+
+def open()
+{
+    operateValve("filtered")
+}
+
+def close()
+{
+    operateValve("off")
+}
+
+def bypass()
+{
+    operateValve("bypass")
+}
+
+def operateValve(state, clearOverride = false)
+{
+    sendEvent(name: "desiredValveState", value: state)    
+    
+    def body = [[name: "mode", value: state], [name: "clear-manual-override", value: clearOverride]]
+    def ctrlMap = buildAppCtrlSetter(buildDevDetails(), buildCmdDetails("home-water-filter-set-mode", body))    
+    
+    parent?.sendWssMap(ctrlMap)
+}
+
+import groovy.transform.Field
+
+@Field Map knownPositions = 
+    [
+        0: "bypass",
+        1: "off",
+        2: "filtered",
+        3: "ready",
+        (-1): "unknown"
+    ]
+
+@Field Map knownValveStates = 
+    [
+        0: "bypass",
+        1: "off",
+        2: "filtered",
+        3: "manual override",
+        4: "driving",
+        5: "fault",
+        6: "invalid"
+    ]
+
+@Field Map knownFilterModes = 
+    [
+        0: "bypass",
+        1: "off",
+        2: "filtered",
+        3: "transition",
+        (-1): "unknown"
+    ]
+
+@Field WH_FILTER_VALVE_STATE = "0x115e"
+@Field WH_FILTER_MODE = "0x115f"
+@Field WH_FILTER_POSITION = "0x1167"
+@Field WH_FILTER_FLOW_RATE = "0x1160"
+@Field WH_FILTER_UNKNOWN1163 = "0x1163"
+@Field WH_FILTER_MANUAL_MODE = "0x1168"
+@Field WH_FILTER_FLOW_ALERT = "0x1169"
+@Field WH_FILTER_FLOW_ALERT_SETTINGS = "0x116a"
+@Field WH_FILTER_DAY_USAGE = "0x116d"
+@Field WH_FILTER_LEAK_VALIDITY = "0x116e"
+@Field WH_FILTER_LIFE_REMAINING = "0x1164"
