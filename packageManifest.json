@@ -1,7 +1,7 @@
 {
   "packageName": "hubitat_SmartHQ",
   "author": "tomw",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2022-06-27",
   "bundles": [
@@ -65,7 +65,7 @@
     }
   ],
   "licenseFile": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/LICENSE",
-  "releaseNotes": "0.9.6 - tomw - Additional attributes for dishwasher.\n0.9.5 - tomw - Improved Washer/Dryer support (in SmartHQ Laundry driver).\n0.9.4 - tomw - Improved air conditioner support.\n0.9.3 - tomw - Added Microwave support.  Added Sabbath mode setting for refrigerator and oven.\n0.9.2 - tomw - Make child logging follow system device setting.\n0.9.1 - tomw - Added support for Portable AC.\n0.9.0 - tomw - Initial release.",
+  "releaseNotes": "0.9.7 - gassgs and tomw - Dishwasher commands for start, stop, and pod count management.\n0.9.6 - tomw - Additional attributes for dishwasher.\n0.9.5 - tomw - Improved Washer/Dryer support (in SmartHQ Laundry driver).\n0.9.4 - tomw - Improved air conditioner support.\n0.9.3 - tomw - Added Microwave support.  Added Sabbath mode setting for refrigerator and oven.\n0.9.2 - tomw - Make child logging follow system device setting.\n0.9.1 - tomw - Added support for Portable AC.\n0.9.0 - tomw - Initial release.",
   "documentationLink": "https://github.com/tomwpublic/hubitat_SmartHQ/blob/main/README.md",
   "communityLink": "https://community.hubitat.com/t/support-for-ge-appliances-smarthq/85930/12"
 }
