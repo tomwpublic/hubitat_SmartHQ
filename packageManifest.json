@@ -62,6 +62,13 @@
       "namespace": "tomw",
       "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/devices/smartHQ_microwave",
       "required": false
+    },
+    {
+      "id": "90909e9d-3b13-41f0-95df-24e1697c3a2e",
+      "name": "SmartHQ Home Water Filter",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/devices/smartHQ_homeWaterFilter",
+      "required": false
     }
   ],
   "licenseFile": "https://raw.githubusercontent.com/tomwpublic/hubitat_SmartHQ/main/LICENSE",
