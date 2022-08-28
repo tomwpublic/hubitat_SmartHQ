@@ -123,6 +123,17 @@ def buildErdDetails(code, value)
     return details
 }
 
+def buildCmdDetails(cmd, data = [])
+{
+    def details = 
+        [
+            cmd: cmd,
+            data: data
+        ]
+    
+    return details
+}
+
 def buildWssMsg(method, path, id, body = null)
 {
     def msg =
@@ -165,6 +176,31 @@ def buildErdSetter(devDetails, erdDetails)
     
     def path = "/v1/appliance/${devDetails.mac}/erd/${erdCodeString}"
     def id = "${devDetails.mac}-setErd-${erdCodeString}"
+    def message = buildWssMsg("POST", path, id, body)
+    
+    return message
+}
+
+def buildAppCtrlSetter(devDetails, cmdDetails)
+{
+    if([devDetails, cmdDetails].contains(null))
+    {
+        return
+    }
+    
+    def body =
+        [
+            kind: "appliance#control",
+            userId: devDetails.userId,
+            applianceId: devDetails.mac,
+            command: cmdDetails.cmd,
+            data: cmdDetails.data,
+            ackTimeout: 10,
+            delay: 0
+        ]
+    
+    def path = "/v1/appliance/${devDetails.mac}/control/${cmdDetails.cmd}"
+    def id = ""
     def message = buildWssMsg("POST", path, id, body)
     
     return message
@@ -250,10 +286,32 @@ def setSabbathMode(value)
     setBooleanErd(SABBATH_MODE, boolVal)
 }
 
+def parseSabbathMode(value)
+{
+    value = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    value = decodeErdBool(value?.getAt(0)) ? "enabled" : "disabled"
+    
+    sendEvent(name: "sabbathMode", value: value)
+}
+
 def setSoundLevel(value)
 {
     def boolVal = (value == "true")
     setBooleanErd(SOUND_LEVEL, boolVal)
+}
+
+def setControlLock(value)
+{
+    def boolVal = (value == "true")
+    setBooleanErd(USER_INTERFACE_LOCKED, boolVal)
+}
+
+def parseControlLock(value)
+{
+    value = hubitat.helper.HexUtils.hexStringToByteArray(value)
+    value = decodeErdBool(value?.getAt(0)) ? "locked" : "unlocked"
+    
+    sendEvent(name: "controlPanel", value: value)
 }
 
 @Field APPLIANCE_TYPE = "0x0008"
