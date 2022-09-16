@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+0.9.9 - tomw - Flow rate and daily usage for Home Water Filter.
 0.9.8 - tomw - Home Water Filter suppport.
 0.9.3 - tomw - Added Microwave support.  Added Sabbath mode setting for refrigerator and oven.
 0.9.2 - tomw - Make child logging follow system device setting
@@ -31,8 +32,9 @@ metadata
     {
         capability "Actuator"
         capability "FilterStatus"
+        capability "LiquidFlowRate"
         capability "Refresh"
-        capability "Valve"        
+        capability "Valve"
         
         // descriptive names for open/close Valve commmands
         command "open", [[name: "Select FILTERED mode"]]
@@ -40,12 +42,14 @@ metadata
         // custom command to augment open/close with additional mode        
         command "bypass", [[name: "Select BYPASS mode"]]        
         
-        attribute "filterLife", "number" 
+        attribute "filterLifePercentage", "number"
         attribute "filterMode", "string"               
         attribute "position", "string"
         
         attribute "desiredValveState", "string"
         attribute "valveState", "string"
+        
+        attribute "usageLastDay", "number"
     }
 }
 
@@ -88,7 +92,20 @@ def parse(item)
             filterLife = decodeErdInt(subBytes(fBytes, 0, 4))
             // if less than 5% remaining, mark as "replace"
             sendEvent(name: "filterStatus", value: (filterLife < 5) ? "replace" : "normal")
-            sendEvent(name: "filterLife", value: filterLife)
+            sendEvent(name: "filterLifePercentage", value: filterLife)
+            break
+        
+        case WH_FILTER_FLOW_RATE:
+            fBytes = hubitat.helper.HexUtils.hexStringToByteArray(item.value)
+            rate = decodeErdInt(subBytes(fBytes, 0, 2))?.toInteger()
+            rate = rate / 100
+            sendEvent(name: "rate", value: rate)
+            break
+        
+        case WH_FILTER_DAY_USAGE:
+            fBytes = hubitat.helper.HexUtils.hexStringToByteArray(item.value)
+            usage = decodeErdInt(subBytes(fBytes, 0, 2))?.toInteger()
+            sendEvent(name: "usageLastDay", value: usage)
             break
     }
 }
