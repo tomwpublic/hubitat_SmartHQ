@@ -35,6 +35,7 @@ metadata
         command "setSabbathMode", [[name: "Sabbath mode enable?*", type:"ENUM", constraints: [true, false]]]
         
         attribute "cooktopStatus", "enum", ["on", "off"]
+        attribute "sabbathMode", "string"     
         
         attribute "lowerCookMode", "string"
         attribute "lowerRawTemp", "number"
@@ -93,6 +94,10 @@ def parse(item)
         
         case COOKTOP_STATUS:
             parseCooktopStatus(item.value)
+            break
+        
+        case SABBATH_MODE:
+            parseSabbathMode(item.value)
             break
     }
 }
