@@ -1,0 +1,163 @@
+/*
+
+Copyright 2022 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.9.11 - tomw - Ice Maker support.
+
+*/
+
+metadata 
+{
+    definition(name: "SmartHQ Ice Maker", namespace: "tomw", author: "tomw") 
+    {
+        capability "Refresh"
+        capability "Switch"
+        
+        command "setLightLevel", [[name: "Light level*", type:"ENUM", constraints: lightLevelNames()]]
+        
+        attribute "filterStatus", "string"
+        attribute "lightLevel", "string"
+        attribute "currentStatus", "string"
+    }
+}
+
+#include tomw.smarthqHelpers
+
+def lightLevelNames()
+{
+    knownLightLevels.collect { it.value.toString() }
+}
+
+def refresh()
+{
+    refreshAppliance()
+}
+
+def parse(item)
+{
+    if(!item)
+    {
+        return
+    }
+    
+    logDebug(item)
+    
+    switch(item.erd?.toLowerCase())
+    {
+        case OIM_LIGHT_LEVEL:
+            parseIntegerErd(item.value, 1, knownLightLevels, "lightLevel")
+            break
+        
+        case OIM_FILTER_STATUS:
+            parseIntegerErd(item.value, 1, knownFilterStatuses, "filterStatus")
+            break
+        
+        case OIM_STATUS:
+            parseIntegerErd(item.value, 1, knownStatuses, "currentStatus")
+            break
+        
+        case OIM_POWER:
+            def switchVal = decodeErdBool(hubitat.helper.HexUtils.hexStringToByteArray(item.value)?.getAt(0)) ? "on" : "off"
+            sendEvent(name: "switch", value: switchVal)
+            break
+    }
+}
+
+def parseIntegerErd(value, width, options, eventName)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)    
+    def cState = options[decodeErdInt(subBytes(bytes, 0, width))]
+    
+    sendEvent(name: eventName, value: (null != cState) ? cState : "unknown")
+}
+
+def on()
+{
+    setPowerState(1)
+}
+
+def off()
+{
+    setPowerState(0)
+}
+
+def setPowerState(state)
+{
+    def erdVal = encodeErdInt(state, 1)
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(OIM_POWER, erdVal))
+    
+    parent?.sendWssMap(erdMap)
+}
+
+def setLightLevel(state)
+{
+    setIntegerErd(state, knownLightLevels, OIM_LIGHT_LEVEL)
+}
+
+def setIntegerErd(val, options, erd)
+{
+    def intVal = options.find {val == it.value}?.key?.toInteger()
+    
+    if(null == intVal)
+    {
+        // unsupported value sent, so discarding
+        log.debug "invalid setting (${val})"
+        return
+    }
+    
+    def erdVal = encodeErdInt(intVal, 1)
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(erd, erdVal))
+    
+    parent?.sendWssMap(erdMap)
+}
+
+import groovy.transform.Field
+
+@Field Map knownLightLevels = 
+    [
+        0: "off",
+        1: "on",
+        2: "dim"
+    ]
+                                           
+@Field Map knownFilterStatuses = 
+    [
+        0: "ok",
+        1: "expired",
+    ]
+
+@Field Map knownStatuses = 
+    [
+        0: "making ice",
+        1: "defrosting",
+        2: "cleaning",
+        3: "ice bin full",
+        4: "add water",
+        5: "ice bin missing",
+        6: "idle",
+        255: "unknown"
+    ]
+
+@Field OIM_STATUS = "0x9100"
+@Field OIM_LIGHT_LEVEL = "0x9101"
+@Field OIM_UNKNOWN9102 = "0x9102"
+@Field OIM_FILTER_STATUS = "0x9104"
+@Field OIM_UNKNOWN9106 = "0x9106"
+@Field OIM_POWER = "0x9107"
+@Field OIM_UNKNOWN9108 = "0x9108"
