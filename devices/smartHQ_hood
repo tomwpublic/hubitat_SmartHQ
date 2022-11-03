@@ -1,0 +1,167 @@
+/*
+
+Copyright 2022 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.9.12 - tomw - Hood support.
+
+*/
+
+metadata 
+{
+    definition(name: "SmartHQ Hood", namespace: "tomw", author: "tomw") 
+    {
+        capability "FanControl"
+        capability "Refresh"
+        capability "Switch"
+        
+        command "setLightLevel", [[name: "Light level*", type:"ENUM", constraints: lightLevelNames()]]
+        command "setSpeed", [[name: "Fan speed*", type:"ENUM", description:"Fan speed to set", constraints: fanSpeedNames()]]
+
+        attribute "lightLevel", "string"
+    }
+}
+
+#include tomw.smarthqHelpers
+
+def lightLevelNames()
+{
+    knownLightLevels.collect { it.value.toString() }
+}
+
+def fanSpeedNames()
+{
+    knownFanSpeeds.collect { it.value.toString() }
+}
+
+def refresh()
+{
+    refreshAppliance()
+}
+
+def parse(item)
+{
+    if(!item)
+    {
+        return
+    }
+    
+    logDebug(item)
+    
+    switch(item.erd?.toLowerCase())
+    {
+        case HOOD_LIGHT_LEVEL:
+            parseIntegerErd(item.value, 1, knownLightLevels, "lightLevel")
+            break
+        
+        case HOOD_FAN_SPEED:
+            def fanSpeedVal = parseIntegerErd(item.value, 1, knownFanSpeeds, "speed")
+            sendEvent(name: "switch", value: (fanSpeedVal != "off") ? "on" : "off")
+            break
+    }
+}
+
+def parseIntegerErd(value, width, options, eventName)
+{
+    def bytes = hubitat.helper.HexUtils.hexStringToByteArray(value)    
+    def cState = options[decodeErdInt(subBytes(bytes, 0, width))]    
+    
+    def eventVal = (null != cState) ? cState : "unknown"
+    sendEvent(name: eventName, value: eventVal)
+    
+    return eventVal
+}
+
+def setLightLevel(state)
+{
+    setIntegerErd(state, knownLightLevels, HOOD_LIGHT_LEVEL)
+}
+
+def setSpeed(fanspeed)
+{
+    sendEvent(name: "supportedFanSpeeds", value: fanSpeedNames())
+    setIntegerErd(fanspeed, knownFanSpeeds, HOOD_FAN_SPEED)
+    
+    sendEvent(name: "speed", value: fanspeed)
+}
+
+def cycleSpeed()
+{
+    def speed = device.currentValue("speed")
+    def names = fanSpeedNames()
+    
+    def i = names.indexOf(speed)
+    if(null != i)
+    {
+        i = ((i+1) % names.size()).toInteger()
+        setSpeed(names[i])
+    }
+}
+
+def on()
+{
+    setSpeed("low")    
+}
+
+def off()
+{
+    setSpeed("off")
+}
+
+def setIntegerErd(val, options, erd)
+{
+    def intVal = options.find {val == it.value}?.key?.toInteger()
+    
+    if(null == intVal)
+    {
+        // unsupported value sent, so discarding
+        log.debug "invalid setting (${val})"
+        return
+    }
+    
+    def erdVal = encodeErdInt(intVal, 1)
+    def erdMap = buildErdSetter(buildDevDetails(), buildErdDetails(erd, erdVal))
+    
+    parent?.sendWssMap(erdMap)
+}
+
+import groovy.transform.Field
+
+@Field Map knownLightLevels = 
+    [
+        0: "off",
+        1: "dim",
+        2: "high"
+    ]
+
+@Field Map knownFanSpeeds =
+    [
+        0: "off",
+        1: "low",
+        2: "medium",
+        3: "high",
+        4: "boost"
+    ]
+
+@Field HOOD_TIMER_AVAILABILITY = "0x500f"
+@Field HOOD_TIMER = "0x5020"
+@Field HOOD_FAN_SPEED = "0x5b00"
+@Field HOOD_FAN_SPEED_AVAILABILITY = "0x5b01"
+@Field HOOD_LIGHT_LEVEL = "0x5b02"
+@Field HOOD_LIGHT_LEVEL_AVAILABILITY = "0x5b03"
+@Field HOOD_DELAY_OFF = "0x5b04"
