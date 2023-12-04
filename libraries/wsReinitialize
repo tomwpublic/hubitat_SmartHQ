@@ -25,28 +25,18 @@ def reinitialize()
 def webSocketStatus(String message)
 {
     logDebug("webSocketStatus: ${message}")
+
+    def reInitStrings = ["status: closing", "failure:"]
     
     // thanks for the idea: https://community.hubitat.com/t/websocket-client/11843/15
-    if(message.startsWith("status: open"))
+    if(message?.startsWith("status: open"))
     {
         state.reconnectDelay = 1
         setWasExpectedClose(false)
         
         return
     }
-    else if(message.startsWith("status: closing"))
-    {
-        if(getWasExpectedClose())
-        {
-            setWasExpectedClose(false)
-            return
-        }
-        
-        reinitialize()
-        
-        return
-    }
-    else if(message.startsWith("failure:"))
+    else if(reInitStrings.findAll { message?.contains(it) })
     {
         if(getWasExpectedClose())
         {
@@ -67,7 +57,7 @@ def setWasExpectedClose(wasExpected)
 
 def getWasExpectedClose()
 {
-    return state.wasExpectedClose ?: true
+    return state.wasExpectedClose
 }
 
 def closeWebSocket()
