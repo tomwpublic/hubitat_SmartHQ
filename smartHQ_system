@@ -18,7 +18,7 @@ limitations under the License.
 
 Change history:
 
-0.9.13 - tomw - Bugfix for token failure cases
+0.9.14 - tomw - Bugfix for token failure cases
 0.9.11 - tomw - Ice Maker support
 0.9.10 - tomw - Added selectable region for login
 0.9.4  - tomw - Improved air conditioner support
