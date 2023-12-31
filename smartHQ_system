@@ -18,7 +18,8 @@ limitations under the License.
 
 Change history:
 
-0.9.11 - tomw - Ice Maker support.
+0.9.14 - tomw - Bugfix for token failure cases
+0.9.11 - tomw - Ice Maker support
 0.9.10 - tomw - Added selectable region for login
 0.9.4  - tomw - Improved air conditioner support
 0.9.2  - tomw - Make child logging follow system device setting
@@ -74,9 +75,17 @@ def initialize()
             logDebug("auth = ${auth}")            
         }
     }
+    catch(groovyx.net.http.HttpResponseException | java.net.UnknownHostException e)
+    {
+        logDebug("token failed (1): ${e}") 
+        logDebug("token failed HTTP status: ${e.getResponse()?.getStatus()}")
+        
+        reinitialize()
+        return
+    }
     catch(Exception e)
     {
-        logDebug("token failed: ${e.message}")
+        logDebug("token failed (2): ${e}")        
         return
     }
         
