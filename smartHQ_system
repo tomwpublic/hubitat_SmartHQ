@@ -43,7 +43,7 @@ preferences
     {
         input name: "username", type: "text", title: "username (email)", required: true
         input name: "password", type: "password", title: "password", required: true
-        input name: "loginRegion", type: "enum", title: "authentication region (try different settings if login fails)", options: ["us-east-1", "us-west-2", "eu-west-1"], defaultValue: "us-east-1"
+        input name: "loginRegion", type: "enum", title: "authentication region (try different settings if login fails)", options: ["us-east-1", "us-west-2"], defaultValue: "us-east-1"
     }
     section
     {
