@@ -52,22 +52,19 @@ def webSocketStatus(String message)
 
 def setWasExpectedClose(wasExpected)
 {
-    state.wasExpectedClose = wasExpected
+    setConnState("wasExpectedClose", wasExpected)
 }
 
 def getWasExpectedClose()
 {
-    return state.wasExpectedClose
+    return getConnState("wasExpectedClose")
 }
 
 def closeWebSocket()
 {
     try
     {
-        setWasExpectedClose(true)
-        // wait for state to catch up
-        pauseExecution(500)
-        
+        setWasExpectedClose(true)       
         interfaces.webSocket.close()
     }
     catch (Exception e)
@@ -76,3 +73,15 @@ def closeWebSocket()
     }
 }
 
+import groovy.transform.Field
+@Field static connState = [:].asSynchronized()
+
+def setConnState(name, value)
+{
+    connState?.putAt(name, value)
+}
+
+def getConnState(name)
+{
+    return connState?.getAt(name)
+}
