@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+0.9.15 - tomw - Bugfixes for connection reliability
 0.9.14 - tomw - Bugfix for token failure cases
 0.9.11 - tomw - Ice Maker support
 0.9.10 - tomw - Added selectable region for login
@@ -31,6 +32,7 @@ metadata
 {
     definition(name: "SmartHQ System", namespace: "tomw", author: "tomw") 
     {
+        capability "Actuator"
         capability "Initialize"
     }
 }
@@ -60,9 +62,11 @@ def isLogEnable()
 def initialize()
 {
     closeEventSocket()
+    def currentOp
     
     try
     {
+        currentOp = "token"
         try
         {
             def refresh = get_oauth2_token("refresh")
@@ -72,35 +76,35 @@ def initialize()
         {
             // refresh_token failed for some reason, so try a full re-auth
             def auth = get_oauth2_token("auth")
-            logDebug("auth = ${auth}")            
+            logDebug("auth = ${auth}")
         }
+        
+        currentOp = "wss"
+        def wssInfo = get_wss_credentials()
+        logDebug ("wssInfo = ${wssInfo}")
+        
+        openEventSocket(wssInfo?.endpoint)
+        subscribe_all()
+        get_appliance_list()        
     }
-    catch(groovyx.net.http.HttpResponseException | java.net.UnknownHostException e)
+    catch(java.net.UnknownHostException e)
     {
-        logDebug("token failed (1): ${e}") 
-        logDebug("token failed HTTP status: ${e.getResponse()?.getStatus()}")
+        logDebug("${currentOp} failed (1): ${e}")
+        
+        reinitialize()
+        return
+    }
+    catch(groovyx.net.http.HttpResponseException e)
+    {
+        logDebug("${currentOp} failed HTTP status: ${e.getResponse()?.getStatus()}")
         
         reinitialize()
         return
     }
     catch(Exception e)
     {
-        logDebug("token failed (2): ${e}")        
+        logDebug("${currentOp} failed (2): ${e}")
         return
-    }
-        
-    try
-    {
-        def wssInfo = get_wss_credentials()
-        logDebug ("wssInfo = ${wssInfo}")
-        
-        openEventSocket(wssInfo?.endpoint)
-        subscribe_all()
-        get_appliance_list()
-    }
-    catch(Exception e)
-    {
-        logDebug("initialize failed: ${e.message}")
     }
 }
 
@@ -125,14 +129,7 @@ def parse(String message)
 
 def openEventSocket(url)
 {
-    try
-    {
-        interfaces.webSocket.connect(url, ignoreSSLIssues: true, perMessageDeflate: false)
-    }
-    catch (Exception e)
-    {
-        logDebug("error: ${e.message}")
-    }
+    interfaces.webSocket.connect(url, ignoreSSLIssues: true, perMessageDeflate: false)
 }
 
 def closeEventSocket()
@@ -410,7 +407,6 @@ def get_wss_credentials()
     httpGet(wssParams)
     {
         resp->
-        //logDebug resp.getStatus()
         data = resp.data
     }
     
